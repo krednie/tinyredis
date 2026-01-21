@@ -1,27 +1,37 @@
 #ifndef VALUE_H
 #define VALUE_H
-
+#include <chrono>
+#include <optional>
 #include <string>
 
-enum class ValueType {
+enum class ValueType
+{
     STRING,
     INTEGER
 };
 
-struct Value {
-    ValueType type;
+struct Value
+{
 
-    union {
+    ValueType type;
+    union
+    {
         std::string str;
         long long integer;
     };
 
-    Value();
-    Value(const std::string& s);
-    Value(long long i);
+    std::optional<std::chrono::time_point<std::chrono::steady_clock>> expiration;
 
-    Value(const Value& other);
-    Value& operator=(const Value& other);
+    bool isExpired() const;
+    void setExpiration(long long seconds);
+    void persist();
+    long long getTTL() const;
+
+    Value();
+    Value(const std::string &s);
+    Value(long long i);
+    Value(const Value &other);
+    Value &operator=(const Value &other);
 
     ~Value();
 };

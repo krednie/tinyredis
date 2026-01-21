@@ -87,7 +87,7 @@ int main()
             long long amt = std::stoll(tokens[2]);
             redis.incrby(tokens[1], amt);
         }
-        else if (cmd == "DECR"|| cmd == "decr")
+        else if (cmd == "DECR" || cmd == "decr")
         {
             if (tokens.size() < 2)
             {
@@ -96,7 +96,7 @@ int main()
             }
             redis.decr(tokens[1]);
         }
-        else if (cmd == "DECRBY"|| cmd == "decrby")
+        else if (cmd == "DECRBY" || cmd == "decrby")
         {
             if (tokens.size() < 3)
             {
@@ -114,6 +114,34 @@ int main()
                 continue;
             }
             redis.type(tokens[1]);
+        }
+        else if (cmd == "EXPIRE" || cmd == "expire")
+        {
+            if (tokens.size() < 3)
+            {
+                std::cout << "(error) wrong number of arguments" << std::endl;
+                continue;
+            }
+            long long seconds = std::stoll(tokens[2]);
+            redis.expire(tokens[1], seconds);
+        }
+        else if (cmd == "TTL" || cmd == "ttl")
+        {
+            if (tokens.size() < 2)
+            {
+                std::cout << "(error) wrong number of arguments" << std::endl;
+                continue;
+            }
+            redis.ttl(tokens[1]);
+        }
+        else if (cmd == "PERSIST" || cmd == "persist")
+        {
+            if (tokens.size() < 2)
+            {
+                std::cout << "(error) wrong number of arguments" << std::endl;
+                continue;
+            }
+            redis.persist(tokens[1]);
         }
 
         else if (cmd == "QUIT" || cmd == "quit" || cmd == "EXIT" || cmd == "exit")
