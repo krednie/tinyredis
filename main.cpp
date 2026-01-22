@@ -39,7 +39,13 @@ int main()
                 std::cout << "(error) wrong number of arguments" << std::endl;
                 continue;
             }
-            redis.set(tokens[1], tokens[2]);
+            std::string value;
+            for (size_t i = 2; i < tokens.size(); i++)
+            {
+                if (i > 2) value += " ";
+                value += tokens[i];
+            }
+            redis.set(tokens[1], value);
         }
         else if (cmd == "GET" || cmd == "get")
         {
@@ -143,6 +149,76 @@ int main()
             }
             redis.persist(tokens[1]);
         }
+        else if (cmd == "APPEND" || cmd == "append")
+{
+    if (tokens.size() < 3) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    std::string value;
+    for (size_t i = 2; i < tokens.size(); i++)
+    {
+        if (i > 2) value += " ";
+        value += tokens[i];
+    }
+    redis.append(tokens[1], value);
+}
+else if (cmd == "STRLEN" || cmd == "strlen")
+{
+    if (tokens.size() < 2) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    redis.strlen(tokens[1]);
+}
+else if (cmd == "MGET" || cmd == "mget")
+{
+    if (tokens.size() < 2) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    std::vector<std::string> keys(tokens.begin() + 1, tokens.end());
+    redis.mget(keys);
+}
+else if (cmd == "MSET" || cmd == "mset")
+{
+    if (tokens.size() < 3 || tokens.size() % 2 == 0) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    std::vector<std::string> keyvals(tokens.begin() + 1, tokens.end());
+    redis.mset(keyvals);
+}
+else if (cmd == "GETRANGE" || cmd == "getrange")
+{
+    if (tokens.size() < 4) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    long long start = std::stoll(tokens[2]);
+    long long end = std::stoll(tokens[3]);
+    redis.getrange(tokens[1], start, end);
+}
+else if (cmd == "SETRANGE" || cmd == "setrange")
+{
+    if (tokens.size() < 4) {
+        std::cout << "(error) wrong number of arguments" << std::endl;
+        continue;
+    }
+    long long offset = std::stoll(tokens[2]);
+    std::string value;
+    for (size_t i = 3; i < tokens.size(); i++)
+    {
+        if (i > 3) value += " ";
+        value += tokens[i];
+    }
+    redis.setrange(tokens[1], offset, value);
+}
+else if (cmd == "SAVE" || cmd == "save")
+{
+    redis.saveRDB();
+    redis.startNewAOF();
+}
 
         else if (cmd == "QUIT" || cmd == "quit" || cmd == "EXIT" || cmd == "exit")
         {
