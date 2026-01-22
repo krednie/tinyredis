@@ -319,15 +319,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Inspired by [Redis](https://redis.io/)
-- Built with modern C++17
+- Built with modern C++17, Python
 - Community feedback and contributions
 
 ## 📧 Contact
 
-- **Author**: Your Name
-- **Email**: your.email@example.com
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/tinyredis/issues)
+- **Author**: Yash kumar
+- **Email**: krednie@gmail.com
+- **GitHub**: [@krednie](https://github.com/krednie)
+- **Issues**: [GitHub Issues](https://github.com/krednie/tinyredis/issues)
 
 ## ⭐ Star History
 
