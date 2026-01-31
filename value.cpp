@@ -12,6 +12,18 @@ Value::Value(long long i) : type(ValueType::INTEGER), data(i), expiration(std::n
 {
 }
 
+Value::Value(const RedisList& l) : type(ValueType::LIST), data(l), expiration(std::nullopt)
+{
+}
+
+Value::Value(const RedisSet& s) : type(ValueType::SET), data(s), expiration(std::nullopt)
+{
+}
+
+Value::Value(const RedisHash& h) : type(ValueType::HASH), data(h), expiration(std::nullopt)
+{
+}
+
 bool Value::isExpired() const
 {
     if(!expiration.has_value())

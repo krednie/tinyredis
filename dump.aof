@@ -1,2 +1,0 @@
-INCRBY name -40
-INCRBY name -500

@@ -410,6 +410,308 @@ std::string Server::executeCommand(const std::vector<std::string> &tokens)
         return RESP::encodeInteger(len);
     }
 
+    // ============== List Commands ==============
+    
+    // Handle LPUSH command
+    else if (cmd == "LPUSH" && tokens.size() >= 3)
+    {
+        std::vector<std::string> values(tokens.begin() + 2, tokens.end());
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long len = db_.lpush(tokens[1], values);
+        std::cout.rdbuf(old);
+        
+        if (len < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(len);
+    }
+
+    // Handle RPUSH command
+    else if (cmd == "RPUSH" && tokens.size() >= 3)
+    {
+        std::vector<std::string> values(tokens.begin() + 2, tokens.end());
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long len = db_.rpush(tokens[1], values);
+        std::cout.rdbuf(old);
+        
+        if (len < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(len);
+    }
+
+    // Handle LPOP command
+    else if (cmd == "LPOP" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::string result = db_.lpop(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (result.empty() && buffer.str().find("nil") != std::string::npos)
+            return RESP::encodeNullBulkString();
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeBulkString(result);
+    }
+
+    // Handle RPOP command
+    else if (cmd == "RPOP" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::string result = db_.rpop(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (result.empty() && buffer.str().find("nil") != std::string::npos)
+            return RESP::encodeNullBulkString();
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeBulkString(result);
+    }
+
+    // Handle LLEN command
+    else if (cmd == "LLEN" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long len = db_.llen(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (len < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(len);
+    }
+
+    // Handle LRANGE command
+    else if (cmd == "LRANGE" && tokens.size() >= 4)
+    {
+        long long start = std::stoll(tokens[2]);
+        long long stop = std::stoll(tokens[3]);
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::vector<std::string> result = db_.lrange(tokens[1], start, stop);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeArray(result);
+    }
+
+    // Handle LINDEX command
+    else if (cmd == "LINDEX" && tokens.size() >= 3)
+    {
+        long long index = std::stoll(tokens[2]);
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::string result = db_.lindex(tokens[1], index);
+        std::cout.rdbuf(old);
+        
+        if (result.empty() && buffer.str().find("nil") != std::string::npos)
+            return RESP::encodeNullBulkString();
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeBulkString(result);
+    }
+
+    // Handle LSET command
+    else if (cmd == "LSET" && tokens.size() >= 4)
+    {
+        long long index = std::stoll(tokens[2]);
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        bool success = db_.lset(tokens[1], index, tokens[3]);
+        std::cout.rdbuf(old);
+        
+        if (!success)
+        {
+            if (buffer.str().find("WRONGTYPE") != std::string::npos)
+                return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+            if (buffer.str().find("no such key") != std::string::npos)
+                return RESP::encodeError("ERR no such key");
+            return RESP::encodeError("ERR index out of range");
+        }
+        return RESP::encodeSimpleString("OK");
+    }
+
+    // ============== Set Commands ==============
+    
+    // Handle SADD command
+    else if (cmd == "SADD" && tokens.size() >= 3)
+    {
+        std::vector<std::string> members(tokens.begin() + 2, tokens.end());
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long added = db_.sadd(tokens[1], members);
+        std::cout.rdbuf(old);
+        
+        if (added < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(added);
+    }
+
+    // Handle SREM command
+    else if (cmd == "SREM" && tokens.size() >= 3)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long removed = db_.srem(tokens[1], tokens[2]);
+        std::cout.rdbuf(old);
+        
+        if (removed < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(removed);
+    }
+
+    // Handle SMEMBERS command
+    else if (cmd == "SMEMBERS" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::vector<std::string> members = db_.smembers(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeArray(members);
+    }
+
+    // Handle SISMEMBER command
+    else if (cmd == "SISMEMBER" && tokens.size() >= 3)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        bool exists = db_.sismember(tokens[1], tokens[2]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(exists ? 1 : 0);
+    }
+
+    // Handle SCARD command
+    else if (cmd == "SCARD" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long size = db_.scard(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (size < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(size);
+    }
+
+    // ============== Hash Commands ==============
+    
+    // Handle HSET command
+    else if (cmd == "HSET" && tokens.size() >= 4)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        bool isNew = db_.hset(tokens[1], tokens[2], tokens[3]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        // Parse isNew from buffer output "(integer) N"
+        return RESP::encodeInteger(buffer.str().find("1") != std::string::npos ? 1 : 0);
+    }
+
+    // Handle HGET command
+    else if (cmd == "HGET" && tokens.size() >= 3)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::string result = db_.hget(tokens[1], tokens[2]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("nil") != std::string::npos)
+            return RESP::encodeNullBulkString();
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeBulkString(result);
+    }
+
+    // Handle HDEL command
+    else if (cmd == "HDEL" && tokens.size() >= 3)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        bool deleted = db_.hdel(tokens[1], tokens[2]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(deleted ? 1 : 0);
+    }
+
+    // Handle HGETALL command
+    else if (cmd == "HGETALL" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        auto pairs = db_.hgetall(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        
+        // Flatten pairs into array
+        std::vector<std::string> result;
+        for (const auto& p : pairs)
+        {
+            result.push_back(p.first);
+            result.push_back(p.second);
+        }
+        return RESP::encodeArray(result);
+    }
+
+    // Handle HKEYS command
+    else if (cmd == "HKEYS" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::vector<std::string> keys = db_.hkeys(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeArray(keys);
+    }
+
+    // Handle HVALS command
+    else if (cmd == "HVALS" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        std::vector<std::string> vals = db_.hvals(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeArray(vals);
+    }
+
+    // Handle HLEN command
+    else if (cmd == "HLEN" && tokens.size() >= 2)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        long long len = db_.hlen(tokens[1]);
+        std::cout.rdbuf(old);
+        
+        if (len < 0) return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(len);
+    }
+
+    // Handle HEXISTS command
+    else if (cmd == "HEXISTS" && tokens.size() >= 3)
+    {
+        std::stringstream buffer;
+        std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+        bool exists = db_.hexists(tokens[1], tokens[2]);
+        std::cout.rdbuf(old);
+        
+        if (buffer.str().find("WRONGTYPE") != std::string::npos)
+            return RESP::encodeError("WRONGTYPE Operation against a key holding the wrong kind of value");
+        return RESP::encodeInteger(exists ? 1 : 0);
+    }
+
     return RESP::encodeError("ERR unknown command '" + tokens[0] + "'");
 }
 

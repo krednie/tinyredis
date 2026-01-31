@@ -5,6 +5,7 @@
 #include <string>
 #include <fstream>
 #include <chrono>
+#include <vector>
 #include "value.h"
 
 class Db
@@ -31,6 +32,7 @@ public:
 
     ~Db();
 
+    // ============== String Commands ==============
     void set(const std::string &key, const std::string &value);
     bool get(const std::string &key);
     bool del(const std::string &key);
@@ -45,16 +47,45 @@ public:
     void mset(const std::vector<std::string>& keyvals);
     std::string getrange(const std::string& key, long long start, long long end);
     long long setrange(const std::string& key, long long offset, const std::string& value);
+    
+    // ============== Key Commands ==============
     bool expire(const std::string &key, long long seconds);
     long long ttl(const std::string &key);
     bool persist(const std::string &key);
     std::string type(const std::string& key);
+    
+    // ============== List Commands ==============
+    long long lpush(const std::string& key, const std::vector<std::string>& values);
+    long long rpush(const std::string& key, const std::vector<std::string>& values);
+    std::string lpop(const std::string& key);
+    std::string rpop(const std::string& key);
+    long long llen(const std::string& key);
+    std::vector<std::string> lrange(const std::string& key, long long start, long long stop);
+    std::string lindex(const std::string& key, long long index);
+    bool lset(const std::string& key, long long index, const std::string& value);
+    
+    // ============== Set Commands ==============
+    long long sadd(const std::string& key, const std::vector<std::string>& members);
+    long long srem(const std::string& key, const std::string& member);
+    std::vector<std::string> smembers(const std::string& key);
+    bool sismember(const std::string& key, const std::string& member);
+    long long scard(const std::string& key);
+    
+    // ============== Hash Commands ==============
+    bool hset(const std::string& key, const std::string& field, const std::string& value);
+    std::string hget(const std::string& key, const std::string& field);
+    bool hdel(const std::string& key, const std::string& field);
+    std::vector<std::pair<std::string, std::string>> hgetall(const std::string& key);
+    std::vector<std::string> hkeys(const std::string& key);
+    std::vector<std::string> hvals(const std::string& key);
+    long long hlen(const std::string& key);
+    bool hexists(const std::string& key, const std::string& field);
+    
+    // ============== Persistence ==============
     bool saveRDB();
     bool loadRDB();
     bool loadAOF();
     void startNewAOF();
-
 };
 
-#endif
 #endif

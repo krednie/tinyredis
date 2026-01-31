@@ -666,19 +666,27 @@ std::string Db::type(const std::string &key)
 
     Value &v = it->second;
 
-    if (v.type == ValueType::STRING)
+    switch (v.type)
     {
+    case ValueType::STRING:
         std::cout << "string" << std::endl;
         return "string";
+    case ValueType::INTEGER:
+        std::cout << "string" << std::endl;  // Redis returns "string" for integers too
+        return "string";
+    case ValueType::LIST:
+        std::cout << "list" << std::endl;
+        return "list";
+    case ValueType::SET:
+        std::cout << "set" << std::endl;
+        return "set";
+    case ValueType::HASH:
+        std::cout << "hash" << std::endl;
+        return "hash";
+    default:
+        std::cout << "none" << std::endl;
+        return "none";
     }
-
-    if (v.type == ValueType::INTEGER)
-    {
-        std::cout << "integer" << std::endl;
-        return "integer";
-    }
-
-    return "none";
 }
 
 void Db::cleanupIfExpired(const std::string &key)
@@ -938,4 +946,679 @@ long long Db::setrange(const std::string &key, long long offset, const std::stri
 
     std::cout << "(integer) " << v.str().length() << std::endl;
     return v.str().length();
+}
+
+// ============== List Commands ==============
+
+long long Db::lpush(const std::string& key, const std::vector<std::string>& values)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        // Create new list
+        RedisList newList;
+        for (auto rit = values.rbegin(); rit != values.rend(); ++rit)
+        {
+            newList.push_front(*rit);
+        }
+        bucketstore[key] = Value(newList);
+    }
+    else if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    else
+    {
+        // Push to existing list
+        for (auto rit = values.rbegin(); rit != values.rend(); ++rit)
+        {
+            it->second.list().push_front(*rit);
+        }
+    }
+    
+    // Log to AOF
+    for (const auto& val : values)
+    {
+        logToAOF("LPUSH " + key + " " + val);
+    }
+    checkAutoSave();
+    
+    long long len = bucketstore[key].list().size();
+    std::cout << "(integer) " << len << std::endl;
+    return len;
+}
+
+long long Db::rpush(const std::string& key, const std::vector<std::string>& values)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        RedisList newList(values.begin(), values.end());
+        bucketstore[key] = Value(newList);
+    }
+    else if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    else
+    {
+        for (const auto& val : values)
+        {
+            it->second.list().push_back(val);
+        }
+    }
+    
+    for (const auto& val : values)
+    {
+        logToAOF("RPUSH " + key + " " + val);
+    }
+    checkAutoSave();
+    
+    long long len = bucketstore[key].list().size();
+    std::cout << "(integer) " << len << std::endl;
+    return len;
+}
+
+std::string Db::lpop(const std::string& key)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return "";
+    }
+    
+    if (it->second.list().empty())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    std::string result = it->second.list().front();
+    it->second.list().pop_front();
+    
+    // Remove key if list is empty
+    if (it->second.list().empty())
+    {
+        bucketstore.erase(it);
+    }
+    
+    logToAOF("LPOP " + key);
+    checkAutoSave();
+    
+    std::cout << "\"" << result << "\"" << std::endl;
+    return result;
+}
+
+std::string Db::rpop(const std::string& key)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return "";
+    }
+    
+    if (it->second.list().empty())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    std::string result = it->second.list().back();
+    it->second.list().pop_back();
+    
+    if (it->second.list().empty())
+    {
+        bucketstore.erase(it);
+    }
+    
+    logToAOF("RPOP " + key);
+    checkAutoSave();
+    
+    std::cout << "\"" << result << "\"" << std::endl;
+    return result;
+}
+
+long long Db::llen(const std::string& key)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return 0;
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    
+    long long len = it->second.list().size();
+    std::cout << "(integer) " << len << std::endl;
+    return len;
+}
+
+std::vector<std::string> Db::lrange(const std::string& key, long long start, long long stop)
+{
+    cleanupIfExpired(key);
+    std::vector<std::string> result;
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(empty list)" << std::endl;
+        return result;
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return result;
+    }
+    
+    const RedisList& lst = it->second.list();
+    long long len = lst.size();
+    
+    // Handle negative indices
+    if (start < 0) start = len + start;
+    if (stop < 0) stop = len + stop;
+    if (start < 0) start = 0;
+    if (stop >= len) stop = len - 1;
+    
+    if (start > stop || start >= len)
+    {
+        std::cout << "(empty list)" << std::endl;
+        return result;
+    }
+    
+    for (long long i = start; i <= stop; i++)
+    {
+        result.push_back(lst[i]);
+        std::cout << (i - start + 1) << ") \"" << lst[i] << "\"" << std::endl;
+    }
+    
+    return result;
+}
+
+std::string Db::lindex(const std::string& key, long long index)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return "";
+    }
+    
+    const RedisList& lst = it->second.list();
+    long long len = lst.size();
+    
+    if (index < 0) index = len + index;
+    
+    if (index < 0 || index >= len)
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    std::cout << "\"" << lst[index] << "\"" << std::endl;
+    return lst[index];
+}
+
+bool Db::lset(const std::string& key, long long index, const std::string& value)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(error) ERR no such key" << std::endl;
+        return false;
+    }
+    
+    if (it->second.type != ValueType::LIST)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return false;
+    }
+    
+    RedisList& lst = it->second.list();
+    long long len = lst.size();
+    
+    if (index < 0) index = len + index;
+    
+    if (index < 0 || index >= len)
+    {
+        std::cout << "(error) ERR index out of range" << std::endl;
+        return false;
+    }
+    
+    lst[index] = value;
+    logToAOF("LSET " + key + " " + std::to_string(index) + " " + value);
+    checkAutoSave();
+    
+    std::cout << "OK" << std::endl;
+    return true;
+}
+
+// ============== Set Commands ==============
+
+long long Db::sadd(const std::string& key, const std::vector<std::string>& members)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    long long added = 0;
+    
+    if (it == bucketstore.end())
+    {
+        RedisSet newSet(members.begin(), members.end());
+        added = newSet.size();
+        bucketstore[key] = Value(newSet);
+    }
+    else if (it->second.type != ValueType::SET)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    else
+    {
+        for (const auto& member : members)
+        {
+            auto result = it->second.set().insert(member);
+            if (result.second) added++;
+        }
+    }
+    
+    for (const auto& member : members)
+    {
+        logToAOF("SADD " + key + " " + member);
+    }
+    checkAutoSave();
+    
+    std::cout << "(integer) " << added << std::endl;
+    return added;
+}
+
+long long Db::srem(const std::string& key, const std::string& member)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return 0;
+    }
+    
+    if (it->second.type != ValueType::SET)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    
+    long long removed = it->second.set().erase(member);
+    
+    if (it->second.set().empty())
+    {
+        bucketstore.erase(it);
+    }
+    
+    if (removed > 0)
+    {
+        logToAOF("SREM " + key + " " + member);
+        checkAutoSave();
+    }
+    
+    std::cout << "(integer) " << removed << std::endl;
+    return removed;
+}
+
+std::vector<std::string> Db::smembers(const std::string& key)
+{
+    cleanupIfExpired(key);
+    std::vector<std::string> result;
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(empty set)" << std::endl;
+        return result;
+    }
+    
+    if (it->second.type != ValueType::SET)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return result;
+    }
+    
+    int i = 1;
+    for (const auto& member : it->second.set())
+    {
+        result.push_back(member);
+        std::cout << i++ << ") \"" << member << "\"" << std::endl;
+    }
+    
+    return result;
+}
+
+bool Db::sismember(const std::string& key, const std::string& member)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return false;
+    }
+    
+    if (it->second.type != ValueType::SET)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return false;
+    }
+    
+    bool exists = it->second.set().count(member) > 0;
+    std::cout << "(integer) " << (exists ? 1 : 0) << std::endl;
+    return exists;
+}
+
+long long Db::scard(const std::string& key)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return 0;
+    }
+    
+    if (it->second.type != ValueType::SET)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    
+    long long size = it->second.set().size();
+    std::cout << "(integer) " << size << std::endl;
+    return size;
+}
+
+// ============== Hash Commands ==============
+
+bool Db::hset(const std::string& key, const std::string& field, const std::string& value)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    bool isNew = false;
+    
+    if (it == bucketstore.end())
+    {
+        RedisHash newHash;
+        newHash[field] = value;
+        bucketstore[key] = Value(newHash);
+        isNew = true;
+    }
+    else if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return false;
+    }
+    else
+    {
+        isNew = (it->second.hash().find(field) == it->second.hash().end());
+        it->second.hash()[field] = value;
+    }
+    
+    logToAOF("HSET " + key + " " + field + " " + value);
+    checkAutoSave();
+    
+    std::cout << "(integer) " << (isNew ? 1 : 0) << std::endl;
+    return true;
+}
+
+std::string Db::hget(const std::string& key, const std::string& field)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return "";
+    }
+    
+    auto fieldIt = it->second.hash().find(field);
+    if (fieldIt == it->second.hash().end())
+    {
+        std::cout << "(nil)" << std::endl;
+        return "";
+    }
+    
+    std::cout << "\"" << fieldIt->second << "\"" << std::endl;
+    return fieldIt->second;
+}
+
+bool Db::hdel(const std::string& key, const std::string& field)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return false;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return false;
+    }
+    
+    bool deleted = it->second.hash().erase(field) > 0;
+    
+    if (it->second.hash().empty())
+    {
+        bucketstore.erase(it);
+    }
+    
+    if (deleted)
+    {
+        logToAOF("HDEL " + key + " " + field);
+        checkAutoSave();
+    }
+    
+    std::cout << "(integer) " << (deleted ? 1 : 0) << std::endl;
+    return deleted;
+}
+
+std::vector<std::pair<std::string, std::string>> Db::hgetall(const std::string& key)
+{
+    cleanupIfExpired(key);
+    std::vector<std::pair<std::string, std::string>> result;
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(empty hash)" << std::endl;
+        return result;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return result;
+    }
+    
+    int i = 1;
+    for (const auto& pair : it->second.hash())
+    {
+        result.push_back(pair);
+        std::cout << i++ << ") \"" << pair.first << "\"" << std::endl;
+        std::cout << i++ << ") \"" << pair.second << "\"" << std::endl;
+    }
+    
+    return result;
+}
+
+std::vector<std::string> Db::hkeys(const std::string& key)
+{
+    cleanupIfExpired(key);
+    std::vector<std::string> result;
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(empty list)" << std::endl;
+        return result;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return result;
+    }
+    
+    int i = 1;
+    for (const auto& pair : it->second.hash())
+    {
+        result.push_back(pair.first);
+        std::cout << i++ << ") \"" << pair.first << "\"" << std::endl;
+    }
+    
+    return result;
+}
+
+std::vector<std::string> Db::hvals(const std::string& key)
+{
+    cleanupIfExpired(key);
+    std::vector<std::string> result;
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(empty list)" << std::endl;
+        return result;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return result;
+    }
+    
+    int i = 1;
+    for (const auto& pair : it->second.hash())
+    {
+        result.push_back(pair.second);
+        std::cout << i++ << ") \"" << pair.second << "\"" << std::endl;
+    }
+    
+    return result;
+}
+
+long long Db::hlen(const std::string& key)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return 0;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return -1;
+    }
+    
+    long long size = it->second.hash().size();
+    std::cout << "(integer) " << size << std::endl;
+    return size;
+}
+
+bool Db::hexists(const std::string& key, const std::string& field)
+{
+    cleanupIfExpired(key);
+    
+    auto it = bucketstore.find(key);
+    
+    if (it == bucketstore.end())
+    {
+        std::cout << "(integer) 0" << std::endl;
+        return false;
+    }
+    
+    if (it->second.type != ValueType::HASH)
+    {
+        std::cout << "(error) WRONGTYPE" << std::endl;
+        return false;
+    }
+    
+    bool exists = it->second.hash().count(field) > 0;
+    std::cout << "(integer) " << (exists ? 1 : 0) << std::endl;
+    return exists;
 }
