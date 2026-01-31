@@ -1,6 +1,7 @@
 #include "db.h"
 #include <cstdio>
 #include <iostream>
+#include <vector>
 #include <sstream>
 
 static std::string jsonEscape(const std::string &s)
@@ -164,12 +165,12 @@ bool Db::saveRDB()
         if (val.type == ValueType::STRING)
         {
             file << "    \"type\": \"string\",\n";
-            file << "    \"value\": \"" << jsonEscape(val.str) << "\"";
+            file << "    \"value\": \"" << jsonEscape(val.str()) << "\"";
         }
         else if (val.type == ValueType::INTEGER)
         {
             file << "    \"type\": \"integer\",\n";
-            file << "    \"value\": " << val.integer;
+            file << "    \"value\": " << val.integer();
         }
 
         long long ttl = val.getTTL();
@@ -363,7 +364,7 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::INTEGER)
             {
-                it->second.integer += 1;
+                it->second.integer() += 1;
             }
         }
 
@@ -381,7 +382,7 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::INTEGER)
             {
-                it->second.integer += amount;
+                it->second.integer() += amount;
             }
         }
 
@@ -398,7 +399,7 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::INTEGER)
             {
-                it->second.integer -= 1;
+                it->second.integer() -= 1;
             }
         }
 
@@ -416,7 +417,7 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::INTEGER)
             {
-                it->second.integer -= amount;
+                it->second.integer() -= amount;
             }
         }
 
@@ -432,7 +433,7 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::STRING)
             {
-                it->second.str.append(tokens[2]);
+                it->second.str().append(tokens[2]);
             }
         }
 
@@ -456,13 +457,13 @@ bool Db::loadAOF()
             }
             else if (it->second.type == ValueType::STRING)
             {
-                if (offset + value.length() > it->second.str.length())
+                if (offset + value.length() > it->second.str().length())
                 {
-                    it->second.str.resize(offset + value.length(), '\0');
+                    it->second.str().resize(offset + value.length(), '\0');
                 }
                 for (size_t i = 0; i < value.length(); i++)
                 {
-                    it->second.str[offset + i] = value[i];
+                    it->second.str()[offset + i] = value[i];
                 }
             }
         }
@@ -540,12 +541,12 @@ bool Db::get(const std::string &key)
 
     if (v.type == ValueType::STRING)
     {
-        std::cout << v.str << std::endl;
+        std::cout << v.str() << std::endl;
         return true;
     }
     else if (v.type == ValueType::INTEGER)
     {
-        std::cout << v.integer << std::endl;
+        std::cout << v.integer() << std::endl;
         return true;
     }
     return false;
@@ -604,8 +605,8 @@ bool Db::incr(const std::string &key)
         return false;
     }
 
-    v.integer += 1;
-    std::cout << "(integer) " << v.integer << std::endl;
+    v.integer() += 1;
+    std::cout << "(integer) " << v.integer() << std::endl;
     logToAOF("INCR " + key);
     checkAutoSave();
 
@@ -635,10 +636,10 @@ bool Db::incrby(const std::string &key, long long amount)
         return false;
     }
 
-    v.integer += amount;
+    v.integer() += amount;
     logToAOF("INCRBY " + key + " " + std::to_string(amount));
     checkAutoSave();
-    std::cout << "(integer) " << v.integer << std::endl;
+    std::cout << "(integer) " << v.integer() << std::endl;
     return true;
 }
 
@@ -770,11 +771,11 @@ long long Db::append(const std::string &key, const std::string &value)
         return -1;
     }
 
-    v.str.append(value);
+    v.str().append(value);
     logToAOF("APPEND " + key + " " + value);
     checkAutoSave();
-    std::cout << "(integer) " << v.str.length() << std::endl;
-    return v.str.length();
+    std::cout << "(integer) " << v.str().length() << std::endl;
+    return v.str().length();
 }
 
 long long Db::strlen(const std::string &key)
@@ -797,8 +798,8 @@ long long Db::strlen(const std::string &key)
         return -1;
     }
 
-    std::cout << "(integer) " << v.str.length() << std::endl;
-    return v.str.length();
+    std::cout << "(integer) " << v.str().length() << std::endl;
+    return v.str().length();
 }
 
 void Db::mget(const std::vector<std::string> &keys)
@@ -821,11 +822,11 @@ void Db::mget(const std::vector<std::string> &keys)
 
         if (v.type == ValueType::STRING)
         {
-            std::cout << "\"" << v.str << "\"" << std::endl;
+            std::cout << "\"" << v.str() << "\"" << std::endl;
         }
         else if (v.type == ValueType::INTEGER)
         {
-            std::cout << v.integer << std::endl;
+            std::cout << v.integer() << std::endl;
         }
         else
         {
@@ -874,7 +875,7 @@ std::string Db::getrange(const std::string &key, long long start, long long end)
         return "";
     }
 
-    long long len = v.str.length();
+    long long len = v.str().length();
 
     if (start < 0)
         start = len + start;
@@ -890,7 +891,7 @@ std::string Db::getrange(const std::string &key, long long start, long long end)
         return "";
     }
 
-    std::string result = v.str.substr(start, end - start + 1);
+    std::string result = v.str().substr(start, end - start + 1);
     std::cout << "\"" << result << "\"" << std::endl;
     return result;
 }
@@ -923,18 +924,18 @@ long long Db::setrange(const std::string &key, long long offset, const std::stri
         return -1;
     }
 
-    if (offset + value.length() > v.str.length())
+    if (offset + value.length() > v.str().length())
     {
-        v.str.resize(offset + value.length(), '\0');
+        v.str().resize(offset + value.length(), '\0');
     }
 
     for (size_t i = 0; i < value.length(); i++)
     {
-        v.str[offset + i] = value[i];
+        v.str()[offset + i] = value[i];
     }
     logToAOF("SETRANGE " + key + " " + std::to_string(offset) + " " + value);
     checkAutoSave();
 
-    std::cout << "(integer) " << v.str.length() << std::endl;
-    return v.str.length();
+    std::cout << "(integer) " << v.str().length() << std::endl;
+    return v.str().length();
 }

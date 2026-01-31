@@ -1,56 +1,15 @@
 #include "value.h"
-#include <new>
 
-Value::Value() : type(ValueType::STRING), expiration(std::nullopt)
+Value::Value() : type(ValueType::STRING), data(std::string()), expiration(std::nullopt)
 {
-    new (&str) std::string();
 }
 
-Value::Value(const std::string& s) : type(ValueType::STRING)
+Value::Value(const std::string& s) : type(ValueType::STRING), data(s), expiration(std::nullopt)
 {
-    new (&str) std::string(s);
 }
 
-Value::Value(long long i) : type(ValueType::INTEGER), expiration(std::nullopt)
+Value::Value(long long i) : type(ValueType::INTEGER), data(i), expiration(std::nullopt)
 {
-    integer = i;
-}
-
-Value::~Value()
-{
-    if (type == ValueType::STRING) {
-        str.~basic_string();
-    }
-}
-
-Value::Value(const Value& other) : type(other.type), expiration(other.expiration)
-{
-    if (type == ValueType::STRING) {
-        new (&str) std::string(other.str);
-    } else {
-        integer = other.integer;
-    }
-}
-
-Value& Value::operator=(const Value& other)
-{
-    if (this == &other)
-        return *this;
-
-    if (type == ValueType::STRING) {
-        str.~basic_string();
-    }
-
-    type = other.type;
-    expiration = other.expiration;
-
-    if (type == ValueType::STRING) {
-        new (&str) std::string(other.str);
-    } else {
-        integer = other.integer;
-    }
-
-    return *this;
 }
 
 bool Value::isExpired() const
@@ -72,6 +31,7 @@ void Value::persist()
 {
     expiration = std::nullopt;
 }
+
 long long Value::getTTL() const
 {
     if (!expiration.has_value()) {

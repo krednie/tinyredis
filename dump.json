@@ -1,0 +1,22 @@
+{
+  "name": {
+    "type": "integer",
+    "value": 51,
+    "ttl": -1
+  },
+  "user": {
+    "type": "string",
+    "value": "yash",
+    "ttl": -1
+  },
+  "user1": {
+    "type": "string",
+    "value": "yash yadav",
+    "ttl": -1
+  },
+  "visits": {
+    "type": "integer",
+    "value": 2,
+    "ttl": -1
+  }
+}
