@@ -1,9 +1,0 @@
-# Starting TinyRedis Server...
-# Database loaded from dump.json and dump.aof
-# Press Ctrl+C to stop the server
-# Socket created: 3
-# Socket options set (SO_REUSEADDR)
-Failed to bind socket to port 6379
-# Closing server socket...
-OK
-# Database saved to dump.json
